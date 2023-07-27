@@ -8,6 +8,18 @@ RUN set -x; \
     && rm bookstack.tar.gz
 
 FROM php:8.2-apache-bookworm as final
+
+ARG TARGETPLATFORM
+
+RUN if [ "$TARGETPLATFORM" = "linux/amd64" ]; then \
+      echo "amd64" > /tmp/platform; \
+    elif [ "$TARGETPLATFORM" = "linux/arm64" ]; then \
+      echo "arm64" > /tmp/platform; \
+    else \
+      echo "Unsupported platform: $TARGETPLATFORM"; \
+      exit 1; \
+    fi
+
 RUN set -x; \
     apt-get update \
     && apt-get install -y --no-install-recommends \
@@ -27,7 +39,7 @@ RUN set -x; \
         curl \
         libzip-dev \
         unzip \
-    && wget -O wkhtmltox.deb https://github.com/wkhtmltopdf/packaging/releases/download/0.12.6.1-3/wkhtmltox_0.12.6.1-3.bookworm_amd64.deb \
+    && wget -O wkhtmltox.deb https://github.com/wkhtmltopdf/packaging/releases/download/0.12.6.1-3/wkhtmltox_0.12.6.1-3.bookworm_$(cat /tmp/platform).deb \
     && chmod a+x ./wkhtmltox.deb \
     && apt-get install -y ./wkhtmltox.deb \
     && rm ./wkhtmltox.deb \

@@ -23,7 +23,20 @@ jobs:
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v2
 
-    - name: Build Image
+    - name: Build ARM64 Image
+      uses: docker/build-push-action@v4
+      with:
+        context: .
+        file: ./Dockerfile
+        platforms: linux/arm64
+        push: false
+        tags: |
+          ${{ steps.docker_meta_ci.outputs.tags }}
+        labels: ${{ steps.docker_meta_ci.outputs.labels }}
+        cache-from: type=registry,ref=solidnerd/bookstack-dev:master
+        outputs: type=docker,dest=/tmp/arm-image-bookstack.tar
+    
+    - name: Build AMD64 Image
       uses: docker/build-push-action@v4
       with:
         context: .
@@ -34,14 +47,22 @@ jobs:
           ${{ steps.docker_meta_ci.outputs.tags }}
         labels: ${{ steps.docker_meta_ci.outputs.labels }}
         cache-from: type=registry,ref=solidnerd/bookstack-dev:master
-        outputs: type=docker,dest=/tmp/image-bookstack.tar
+        outputs: type=docker,dest=/tmp/amd-image-bookstack.tar
 
     - name: Upload artifact
       uses: actions/upload-artifact@v3
       with:
         name: image-bookstack-master
-        path: /tmp/image-bookstack.tar
+        path: /tmp/arm-image-bookstack.tar
         if-no-files-found: warn
+    
+    - name: Upload artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: image-bookstack-master
+        path: /tmp/amd-image-bookstack.tar
+        if-no-files-found: warn
+
 
   e2e:
     runs-on: ubuntu-latest
@@ -58,7 +79,8 @@ jobs:
 
     - name: Load Docker image
       run: |
-        docker load --input /tmp/image-bookstack.tar
+        docker load --input /tmp/amd-image-bookstack.tar
+        docker load --input /tmp/arm-image-bookstack.tar
         docker image ls -a
 
   push:
@@ -86,9 +108,11 @@ jobs:
         name: image-bookstack-master
         path: /tmp
         if-no-files-found: warn
+
     - name: Load Docker image
       run: |
-        docker load --input /tmp/image-bookstack.tar
+        docker load --input /tmp/arm-image-bookstack.tar
+        docker load --input /tmp/amd-image-bookstack.tar
         docker image ls -a
 
     - name: Set up QEMU
@@ -111,7 +135,20 @@ jobs:
         username: ${{ github.repository_owner }}
         password: ${{ secrets.CR_PAT }}
 
-    - name: Build and Push
+    - name: Build and Push ARM64 Image
+      uses: docker/build-push-action@v4
+      with:
+        context: .
+        file: ./Dockerfile
+        platforms: linux/arm64
+        push: ${{ github.event_name != 'pull_request' }}
+        tags: |
+          ${{ steps.docker_meta.outputs.tags }}
+        labels: ${{ steps.docker_meta.outputs.labels }}
+        cache-from: type=registry,ref=solidnerd/bookstack-dev:${{ github.sha }}
+        cache-to: type=registry,ref=solidnerd/bookstack-dev:${{ github.sha }}
+
+    - name: Build and Push AMD64 Image
       uses: docker/build-push-action@v4
       with:
         context: .
